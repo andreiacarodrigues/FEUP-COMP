@@ -1,0 +1,13 @@
+start:
+loadI 0 => r0
+loadI 10 => r1
+loadI 5 => r2
+loop:
+cmp_LE r1,r0 => r3
+cbr r3 -> end,continue
+continue:
+mult r2,r2 => r2
+subI r1,1 => r1
+jumpl -> loop
+end:
+add r0,r0 => r0

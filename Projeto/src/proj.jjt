@@ -1,0 +1,112 @@
+options
+{
+ LOOKAHEAD=1;
+}
+PARSER_BEGIN(ILOCParser)
+import java.util.Arrays;
+public class ILOCParser
+{
+ 	public static void main(String args[]) throws Exception
+ 	{
+ 	  	java.io.FileInputStream fis = new java.io.FileInputStream("test");
+		ILOCParser myParser = new ILOCParser(fis);
+		SimpleNode node = myParser.ILOCProgram();
+
+		node.dump("");
+ 	}
+}
+PARSER_END(ILOCParser)
+SKIP:
+{
+    " " | "\r" | "\t" | "\n" | <"//"(~["\n"])*"\n">
+}
+TOKEN:
+{
+    <STACKPOINTERREGISTER: "rarp"> |
+    <NORMALOPCODE:
+        "nop"|
+        "add"|"sub"|"mult"|"div"|
+        "addI"|"subI"|"rsubI"|"multI"|"divI" |"rdivI"|
+        "lshift"|"lshiftI"|"rshift"|"rshiftI"|
+        "and"|"andI"|"or"|"orI"|"xor"|"xorI"|
+        "loadI"|"load"|"loadAI"|"loadA0"|
+        "cload"|"cloadAI"|"cloadA0"|
+        "store"|"storeAI"|"storeA0"|
+        "cstore"|"cstoreAI"|"cstoreA0"|
+        "i2i"|"c2c"|"c2i"|"i2c"|
+        "cmp_LI"|"cmp_LE"|"cmp_EQ"|"cmp_GE"|"cmp_GT"|"cmp_NE"> |
+    <ASSIGN: "=>"> |
+    <COLON: ":"> |
+    <SEMICOLON: ";"> |
+    <COMMA: ","> |
+    <CBR: "cbr"> |
+    <JUMPL: "jumpl"> |
+    <JUMP: "jump"> |
+    <JUMPARROW: "->"> |
+    <OPENSQUAREBRACKET: "["> |
+    <CLOSESQUAREBRACKET: "]"> |
+    <REGISTER: "r"(["0"-"9"])+> |
+    <LABEL: ["a"-"z"](["a"-"z"] | ["0"-"9"] | "-")*> |
+    <INTEGER: "0" | ["1"-"9"](["0"-"9"])*>
+}
+SimpleNode ILOCProgram() : {}
+{
+  	InstructionList() <EOF>{ return jjtThis; }
+}
+
+void InstructionList() #void: {Token t; }
+{
+    t=<LABEL> {jjtThis.value = new LabelData(t.image);} #LABEL <COLON> Instruction() InstructionList() |
+    LOOKAHEAD(Instruction() <EOF>)
+    Instruction() |
+    Instruction() InstructionList() |
+    <EOF>
+
+}
+
+void Instruction() #void: {}
+{
+    <OPENSQUAREBRACKET> OperationList() <CLOSESQUAREBRACKET> |
+    Operation()
+}
+
+void OperationList() #void: {}
+{
+    LOOKAHEAD(Operation() <SEMICOLON>)
+    Operation() <SEMICOLON> OperationList()|
+  	Operation()
+}
+
+void Operation() #void: {}
+{
+  	NormalOp() |
+  	ControlFlowOp()
+}
+
+void NormalOp(): {Token[] t1, t2; Token t3;}
+{
+  	(t3=<NORMALOPCODE> t1=OperandList() <ASSIGN> t2=OperandList()){jjtThis.value = new NormalOpData(t1, t2, t3);}
+}
+
+Token[] OperandList() #void: {Token t1; Token[] t2;}
+{
+    LOOKAHEAD(Operand() <COMMA>)
+    (t1=Operand() <COMMA> t2=OperandList())
+    {Token[] tokens = new Token[t2.length + 1]; tokens[0] = t1; for(int i = 0; i < t2.length; i++){tokens[i+1] = t2[i];} return tokens;} |
+  	(t1=Operand()) {Token[] tokens = {t1}; return tokens;}
+}
+
+Token Operand(): {Token t1;}
+{
+	(t1=<REGISTER> |
+	t1=<INTEGER> |
+	t1=<LABEL>)
+	{return t1;}
+}
+
+void ControlFlowOp(): {Token t1, t2, t3;}
+{
+	(<CBR> t3=<REGISTER> <JUMPARROW> t1=<LABEL> <COMMA> t2=<LABEL>) {jjtThis.value = new ControlFlowOpData(t1.image, t2.image, t3.image);} |
+	(<JUMPL> <JUMPARROW> t1=<LABEL>) {jjtThis.value = new ControlFlowOpData(t1.image);} |
+	<JUMP> <JUMPARROW> <REGISTER>
+}
